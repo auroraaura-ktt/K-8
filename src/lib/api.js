@@ -1,12 +1,12 @@
 export async function apiRequest(path, options = {}) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
 
   const url = (() => {
     if (/^https?:\/\//i.test(path)) {
       return path
     }
 
-    const trimmedBase = baseUrl.replace(/\/+$|\s+$/g, '')
+    const trimmedBase = baseUrl.replace(/\/+$/g, '')
     const trimmedPath = path.replace(/^\/+/, '')
 
     return `${trimmedBase}/${trimmedPath}`

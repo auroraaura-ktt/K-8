@@ -17,6 +17,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'MiitVerse API root',
+    routes: ['/api/health', '/api/auth', '/api/users'],
+  })
+})
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the MiitVerse API. Use /api/auth or /api/users.' })
 })
