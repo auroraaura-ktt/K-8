@@ -1,12 +1,9 @@
 import { spawn } from 'node:child_process'
 
-const isWindows = process.platform === 'win32'
-const npmCommand = 'npm'
-
-function start(label, command, args) {
-  const child = spawn(command, args, {
+function start(label, command) {
+  const child = spawn(command, {
     stdio: 'inherit',
-    shell: isWindows,
+    shell: true,
   })
 
   child.on('exit', (code) => {
@@ -19,8 +16,8 @@ function start(label, command, args) {
   return child
 }
 
-const client = start('client', npmCommand, ['run', 'dev:client'])
-const server = start('server', npmCommand, ['run', 'dev:server'])
+const client = start('client', 'npm run dev:client')
+const server = start('server', 'npm run dev:server')
 
 function shutdown() {
   client.kill()

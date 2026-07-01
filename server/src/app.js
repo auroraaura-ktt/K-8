@@ -1,10 +1,14 @@
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import cors from 'cors'
 import express from 'express'
 
 import authRoutes from './routes/authRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
+const staticPath = resolve(__dirname, '../public')
 
 app.use(
   cors({
@@ -24,12 +28,18 @@ app.get('/api', (req, res) => {
   })
 })
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the MiitVerse API. Use /api/auth or /api/users.' })
-})
-
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
+
+// Serve frontend build assets
+app.use(express.static(staticPath))
+
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    return res.sendFile(resolve(staticPath, 'index.html'))
+  }
+  next()
+})
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' })

@@ -5,8 +5,8 @@ import { env } from '../config/env.js'
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'miitverse.verify@gmail.com',
-    pass: 'mfbw mbxh furh qwjh', // Gmail App Password
+    user: env.emailUser,
+    pass: env.emailPass,
   },
   logger: true,
   debug: false,
