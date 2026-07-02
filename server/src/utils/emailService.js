@@ -1,19 +1,28 @@
 import nodemailer from 'nodemailer'
 import { env } from '../config/env.js'
 
-// Email configuration
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: env.emailUser,
-    pass: env.emailPass,
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 15000,
-  logger: false,
-  debug: false,
-})
+// Build transporter options: prefer explicit SMTP host if provided, otherwise use service
+const transporterOptions = env.emailHost
+  ? {
+      host: env.emailHost,
+      port: env.emailPort || 465,
+      secure: typeof env.emailSecure === 'boolean' ? env.emailSecure : true,
+      auth: { user: env.emailUser, pass: env.emailPass },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
+      tls: { rejectUnauthorized: false },
+    }
+  : {
+      service: env.emailService || 'gmail',
+      auth: { user: env.emailUser, pass: env.emailPass },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 15000,
+    }
+
+// Create transporter
+const transporter = nodemailer.createTransport(transporterOptions)
 
 /**
  * Send verification email with 8-digit code
@@ -50,11 +59,13 @@ export async function sendVerificationEmail(email, code) {
     }
 
     const info = await transporter.sendMail(mailOptions)
-    console.log('Verification email sent successfully:', info.messageId)
+    console.log('Verification email sent successfully:', info.messageId, info)
     return true
   } catch (error) {
-    console.error('Failed to send verification email:', error.message)
-    throw new Error(`Email sending failed: ${error.message}`)
+    // Log full error to help diagnose Render / SMTP issues
+    console.error('Failed to send verification email:', error)
+    // Re-throw with message preserved to keep existing controller behavior
+    throw new Error(`Email sending failed: ${error && error.message ? error.message : String(error)}`)
   }
 }
 
@@ -64,11 +75,11 @@ export async function sendVerificationEmail(email, code) {
  */
 export async function verifyEmailConnection() {
   try {
-    await transporter.verify()
-    console.log('Email transporter verified successfully')
+    const res = await transporter.verify()
+    console.log('Email transporter verified successfully', res)
     return true
   } catch (error) {
-    console.error('Email transporter verification failed:', error.message)
+    console.error('Email transporter verification failed:', error)
     return false
   }
 }

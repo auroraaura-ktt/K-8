@@ -78,8 +78,10 @@ export async function registerUser(req, res) {
       return res.status(409).json({ message: 'User already exists' })
     }
 
+    // Check whether the username is already pending for a different email.
+    // Allow updating/resending for the same email (avoid blocking existing pending entries).
     const pendingUsernameExists = Array.from(pendingRegistrations.values()).some(
-      (registration) => registration.username === trimmedUsername
+      (registration) => registration.username === trimmedUsername && registration.email !== normalizedEmail
     )
 
     let existingPending = pendingRegistrations.get(normalizedEmail)
