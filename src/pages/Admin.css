@@ -198,12 +198,57 @@
 }
 
 @media (max-width: 768px) {
+  .admin-layout {
+    display: block;
+  }
+
   .admin-sidebar {
     display: none;
   }
 
-  .stats-grid {
+  .admin-main {
+    padding: 20px;
+  }
+
+  .admin-header,
+  .admin-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-header {
+    gap: 18px;
+  }
+
+  .admin-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .stats-grid,
+  .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-profile {
+    justify-content: space-between;
+  }
+
+  .admin-create-form,
+  .reset-password-modal {
+    padding: 20px;
+  }
+
+  .admin-users-table th,
+  .admin-users-table td {
+    padding: 12px;
+  }
+
+  .user-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }
 

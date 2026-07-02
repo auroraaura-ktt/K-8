@@ -30,6 +30,24 @@ function serializeUser(record) {
   }
 }
 
+function sendVerificationEmailInBackground(email, code, pendingRegistration) {
+  sendVerificationEmail(email, code)
+    .then(() => {
+      if (pendingRegistration) {
+        pendingRegistration.emailDeliveryFailed = false
+        pendingRegistration.lastSentAt = Date.now()
+      }
+      console.log(`Verification code successfully sent to ${email}`)
+    })
+    .catch((error) => {
+      console.error(`Failed to send verification email to ${email}:`, error.message)
+      if (pendingRegistration) {
+        pendingRegistration.emailDeliveryFailed = true
+        pendingRegistration.lastSendError = error.message
+      }
+    })
+}
+
 export async function registerUser(req, res) {
   const { username, email, password } = req.body || {}
   const trimmedUsername = username?.trim()
@@ -126,28 +144,15 @@ export async function registerUser(req, res) {
       })
     }
 
-    // CRITICAL: Send verification email. If this fails, abort registration.
-    try {
-      const pending = pendingRegistrations.get(normalizedEmail)
-      await sendVerificationEmail(normalizedEmail, pending.verificationCode)
-      console.log(`Verification code sent to ${normalizedEmail}`)
+    const pending = pendingRegistrations.get(normalizedEmail)
+    sendVerificationEmailInBackground(normalizedEmail, pending.verificationCode, pending)
 
-      return res.status(201).json({
-        message: 'Verification code sent. Please check your email and confirm within 15 minutes to create your account.',
-        email: normalizedEmail,
-        resendAvailableAt: new Date((pending.lastSentAt || Date.now()) + verificationResendCooldownMs).toISOString(),
-        verificationExpiresAt: new Date(pending.verificationExpires).toISOString(),
-      })
-    } catch (emailError) {
-      // Clean up pending registration if email fails
-      pendingRegistrations.delete(normalizedEmail)
-      console.error(`Failed to send verification email to ${normalizedEmail}:`, emailError.message)
-
-      return res.status(500).json({
-        message: 'Failed to send verification email. Please try again.',
-        error: emailError.message,
-      })
-    }
+    return res.status(201).json({
+      message: 'Verification email sending has started. Please check your inbox within a few seconds.',
+      email: normalizedEmail,
+      resendAvailableAt: new Date((pending.lastSentAt || Date.now()) + verificationResendCooldownMs).toISOString(),
+      verificationExpiresAt: new Date(pending.verificationExpires).toISOString(),
+    })
   } catch (error) {
     console.error('Registration error:', error)
     return res.status(500).json({ message: 'Registration failed' })
@@ -189,19 +194,14 @@ export async function resendVerificationCode(req, res) {
   pendingRegistration.verificationExpires = Date.now() + verificationTtlMs
   pendingRegistration.lastSentAt = Date.now()
 
-  try {
-    await sendVerificationEmail(normalizedEmail, verificationCode)
-    console.log(`Verification code resent to ${normalizedEmail}`)
+  sendVerificationEmailInBackground(normalizedEmail, verificationCode, pendingRegistration)
+  console.log(`Background resend started for ${normalizedEmail}`)
 
-    return res.status(200).json({
-      message: 'Verification code resent. Please check your email.',
-      resendAvailableAt: new Date(pendingRegistration.lastSentAt + verificationResendCooldownMs).toISOString(),
-      verificationExpiresAt: new Date(pendingRegistration.verificationExpires).toISOString(),
-    })
-  } catch (emailError) {
-    console.error(`Failed to resend verification email to ${normalizedEmail}:`, emailError.message)
-    return res.status(500).json({ message: 'Failed to resend verification email. Please try again.' })
-  }
+  return res.status(200).json({
+    message: 'Verification email resend started. Please check your inbox shortly.',
+    resendAvailableAt: new Date(pendingRegistration.lastSentAt + verificationResendCooldownMs).toISOString(),
+    verificationExpiresAt: new Date(pendingRegistration.verificationExpires).toISOString(),
+  })
 }
 
 export async function verifyUser(req, res) {
