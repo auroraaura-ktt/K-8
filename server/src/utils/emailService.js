@@ -50,7 +50,17 @@ export async function sendVerificationEmail(email, code) {
     console.error('Failed to send verification email:', error.message || error)
     // SendGrid specific error handling
     if (error.response) {
-      console.error('SendGrid error response:', error.response.body)
+      console.error('SendGrid error status:', error.response.status)
+      console.error('SendGrid error body:', JSON.stringify(error.response.body, null, 2))
+    }
+    if (error.code === 401) {
+      throw new Error('SendGrid API key is invalid or expired')
+    }
+    if (error.code === 403) {
+      throw new Error('SendGrid API key does not have permission to send emails')
+    }
+    if (error.code === 400) {
+      throw new Error(`SendGrid request validation error: ${error.message}`)
     }
     throw new Error(`Email sending failed: ${error?.message || String(error)}`)
   }
@@ -103,7 +113,17 @@ export async function sendEmail(to, subject, html) {
   } catch (error) {
     console.error('Failed to send email:', error.message || error)
     if (error.response) {
-      console.error('SendGrid error response:', error.response.body)
+      console.error('SendGrid error status:', error.response.status)
+      console.error('SendGrid error body:', JSON.stringify(error.response.body, null, 2))
+    }
+    if (error.code === 401) {
+      throw new Error('SendGrid API key is invalid or expired')
+    }
+    if (error.code === 403) {
+      throw new Error('SendGrid API key does not have permission to send emails')
+    }
+    if (error.code === 400) {
+      throw new Error(`SendGrid request validation error: ${error.message}`)
     }
     throw new Error(`Email sending failed: ${error?.message || String(error)}`)
   }
