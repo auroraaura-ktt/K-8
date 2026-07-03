@@ -64,6 +64,11 @@ const retryableEmailErrorCodes = new Set([
   'ENOTFOUND',
 ])
 
+async function ensureTransporterVerified() {
+  transporter = createTransporter()
+  await transporter.verify()
+}
+
 export async function sendVerificationEmail(email, code) {
   const mailOptions = {
     from: '"MiitVerse Account Service" <miitverse.verify@gmail.com>',
@@ -97,16 +102,17 @@ export async function sendVerificationEmail(email, code) {
     return true
   } catch (error) {
     console.error('Failed to send verification email:', error)
-    if (retryableEmailErrorCodes.has(error.code)) {
-      console.warn('Retrying email send after transient SMTP error:', error.code)
-      transporter = createTransporter()
+    const isTransient = retryableEmailErrorCodes.has(error.code) || /timeout|ENETUNREACH|ETIMEDOUT/i.test(error.message)
 
+    if (isTransient) {
+      console.warn('Attempting SMTP reverify after transient send error:', error.code || error.message)
       try {
+        await ensureTransporterVerified()
         const retryInfo = await transporter.sendMail(mailOptions)
         console.log('Verification email sent successfully on retry:', retryInfo.messageId, retryInfo)
         return true
       } catch (retryError) {
-        console.error('Retry failed for verification email:', retryError)
+        console.error('Retry after SMTP reverify failed:', retryError)
         throw new Error(`Email sending failed after retry: ${retryError?.message || String(retryError)}`)
       }
     }
