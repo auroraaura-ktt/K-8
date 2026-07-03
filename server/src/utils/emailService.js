@@ -1,24 +1,37 @@
 import nodemailer from 'nodemailer'
 import { env } from '../config/env.js'
 
-// Build transporter options: prefer explicit SMTP host if provided, otherwise use service
+// Build transporter options: prefer explicit SMTP host if provided, otherwise use service.
+// For Gmail, use explicit smtp.gmail.com to avoid service-specific DNS/timeout issues on Render.
 const transporterOptions = env.emailHost
   ? {
       host: env.emailHost,
       port: env.emailPort || 465,
       secure: typeof env.emailSecure === 'boolean' ? env.emailSecure : true,
       auth: { user: env.emailUser, pass: env.emailPass },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 15000,
-      tls: { rejectUnauthorized: false },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      tls: { rejectUnauthorized: true },
+    }
+  : env.emailService?.toLowerCase() === 'gmail'
+  ? {
+      host: 'smtp.gmail.com',
+      port: env.emailPort || 587,
+      secure: typeof env.emailSecure === 'boolean' ? env.emailSecure : false,
+      requireTLS: true,
+      auth: { user: env.emailUser, pass: env.emailPass },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      tls: { rejectUnauthorized: true },
     }
   : {
       service: env.emailService || 'gmail',
       auth: { user: env.emailUser, pass: env.emailPass },
-      connectionTimeout: 15000,
-      greetingTimeout: 15000,
-      socketTimeout: 15000,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
     }
 
 // Create transporter
