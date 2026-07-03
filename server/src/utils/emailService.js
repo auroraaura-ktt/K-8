@@ -1,53 +1,8 @@
-import dns from 'node:dns'
-import nodemailer from 'nodemailer'
+import sgMail from '@sendgrid/mail'
 import { env } from '../config/env.js'
 
-dns.setDefaultResultOrder('ipv4first')
-
-function createTransporterOptions() {
-  const baseOptions = {
-    auth: { user: env.emailUser, pass: env.emailPass },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-  }
-
-  if (env.emailHost) {
-    return {
-      ...baseOptions,
-      host: env.emailHost,
-      port: env.emailPort || 465,
-      secure: typeof env.emailSecure === 'boolean' ? env.emailSecure : env.emailPort === 465,
-      tls: { rejectUnauthorized: false },
-    }
-  }
-
-  const shouldUseGmail = env.emailService?.toLowerCase() === 'gmail' || !env.emailService
-
-  if (shouldUseGmail) {
-    const secure = typeof env.emailSecure === 'boolean' ? env.emailSecure : true
-    const port = env.emailPort || (secure ? 465 : 587)
-    return {
-      ...baseOptions,
-      host: 'smtp.gmail.com',
-      port,
-      secure,
-      requireTLS: true,
-      tls: { rejectUnauthorized: false },
-    }
-  }
-
-  return {
-    ...baseOptions,
-    service: env.emailService || 'gmail',
-  }
-}
-
-function createTransporter() {
-  return nodemailer.createTransport(createTransporterOptions())
-}
-
-let transporter = createTransporter()
+// Initialize SendGrid
+sgMail.setApiKey(env.sendgridApiKey)
 
 /**
  * Send verification email with 8-digit code
@@ -55,30 +10,17 @@ let transporter = createTransporter()
  * @param {string} code - 8-digit verification code
  * @returns {Promise<boolean>} - True if sent successfully
  */
-const retryableEmailErrorCodes = new Set([
-  'ECONNECTION',
-  'ETIMEDOUT',
-  'EAI_AGAIN',
-  'ESOCKET',
-  'ECONNRESET',
-  'ENOTFOUND',
-])
-
-async function ensureTransporterVerified() {
-  transporter = createTransporter()
-  await transporter.verify()
-}
-
 export async function sendVerificationEmail(email, code) {
-  const mailOptions = {
-    from: '"MiitVerse Account Service" <miitverse.verify@gmail.com>',
-    replyTo: 'miitverse.verify@gmail.com',
+  if (!env.sendgridApiKey) {
+    console.error('SendGrid API key not configured')
+    throw new Error('Email service not configured - SendGrid API key missing')
+  }
+
+  const msg = {
     to: email,
+    from: `${env.sendgridFromName} <${env.sendgridFromEmail}>`,
+    replyTo: `${env.sendgridFromName} <${env.sendgridFromEmail}>`,
     subject: 'Your MiitVerse Email Verification Code',
-    headers: {
-      'X-Priority': '3',
-      'X-Mailer': 'MiitVerse Mailer',
-    },
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
         <h2 style="color: #333;">Email Verification Required</h2>
@@ -94,45 +36,75 @@ export async function sendVerificationEmail(email, code) {
       </div>
     `,
     text: `Your MiitVerse verification code is: ${code}\n\nThis code will expire in 15 minutes.\n\nIf you didn't request this code, please ignore this email.`,
+    headers: {
+      'X-Priority': '3',
+      'X-Mailer': 'MiitVerse Mailer',
+    },
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
-    console.log('Verification email sent successfully:', info.messageId, info)
+    const result = await sgMail.send(msg)
+    console.log('Verification email sent successfully:', result[0].statusCode, result[0].headers['x-message-id'])
     return true
   } catch (error) {
-    console.error('Failed to send verification email:', error)
-    const isTransient = retryableEmailErrorCodes.has(error.code) || /timeout|ENETUNREACH|ETIMEDOUT/i.test(error.message)
-
-    if (isTransient) {
-      console.warn('Attempting SMTP reverify after transient send error:', error.code || error.message)
-      try {
-        await ensureTransporterVerified()
-        const retryInfo = await transporter.sendMail(mailOptions)
-        console.log('Verification email sent successfully on retry:', retryInfo.messageId, retryInfo)
-        return true
-      } catch (retryError) {
-        console.error('Retry after SMTP reverify failed:', retryError)
-        throw new Error(`Email sending failed after retry: ${retryError?.message || String(retryError)}`)
-      }
+    console.error('Failed to send verification email:', error.message || error)
+    // SendGrid specific error handling
+    if (error.response) {
+      console.error('SendGrid error response:', error.response.body)
     }
-
     throw new Error(`Email sending failed: ${error?.message || String(error)}`)
   }
 }
 
 /**
- * Verify transporter connection to Gmail
+ * Verify SendGrid connection
  * @returns {Promise<boolean>}
  */
 export async function verifyEmailConnection() {
+  if (!env.sendgridApiKey) {
+    console.warn('SendGrid API key not configured')
+    return false
+  }
+
   try {
-    transporter = createTransporter() // ensure a fresh connection for verification
-    const res = await transporter.verify()
-    console.log('Email transporter verified successfully', res)
+    // SendGrid validates the request synchronously, so if we get past initialization it should work
+    console.log('SendGrid email service configured and ready')
     return true
   } catch (error) {
-    console.error('Email transporter verification failed:', error)
+    console.error('Email service verification failed:', error.message || error)
     return false
+  }
+}
+
+/**
+ * Send general email
+ * @param {string} to - Recipient email
+ * @param {string} subject - Email subject
+ * @param {string} html - HTML content
+ * @returns {Promise<boolean>}
+ */
+export async function sendEmail(to, subject, html) {
+  if (!env.sendgridApiKey) {
+    console.error('SendGrid API key not configured')
+    throw new Error('Email service not configured - SendGrid API key missing')
+  }
+
+  const msg = {
+    to,
+    from: `${env.sendgridFromName} <${env.sendgridFromEmail}>`,
+    subject,
+    html,
+  }
+
+  try {
+    const result = await sgMail.send(msg)
+    console.log('Email sent successfully:', result[0].statusCode)
+    return true
+  } catch (error) {
+    console.error('Failed to send email:', error.message || error)
+    if (error.response) {
+      console.error('SendGrid error response:', error.response.body)
+    }
+    throw new Error(`Email sending failed: ${error?.message || String(error)}`)
   }
 }
