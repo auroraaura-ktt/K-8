@@ -9,9 +9,10 @@
     "dev:server": "npm --prefix server run dev",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "promote-user": "npm --prefix server run promote-user --",
-    "seed-user": "npm --prefix server run seed-user --"
+    "seed-user": "npm --prefix server run seed-user --",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -19,6 +20,7 @@
     "react-router-dom": "^7.18.0"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.43.0",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -27,6 +29,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "wrangler": "^4.107.0"
   }
 }
